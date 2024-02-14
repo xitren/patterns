@@ -23,6 +23,14 @@ public:
     interval_event(interval_event const& val) = delete;
     interval_event(interval_event&& val)      = delete;
 
+    /**
+     * Constructs a new interval_event object.
+     *
+     * @param function The function to be called periodically.
+     * @param repeat_every The interval at which the function should be called, in milliseconds.
+     * @param wait_between_checks The interval between checks for whether the function should be called, in
+     * milliseconds.
+     */
     interval_event(std::function<void(void)> function, time_type repeat_every = 100ms,
                    time_type wait_between_checks = 20ms)
         : function_{std::move(function)},
@@ -44,8 +52,14 @@ public:
         thread_.detach();
     }
 
+    /**
+     * Destroys the interval_event object.
+     */
     ~interval_event() { stop(); }
 
+    /**
+     * Stops the interval_event object.
+     */
     void
     stop()
     {
@@ -56,27 +70,49 @@ public:
         }
     }
 
+    /**
+     * Returns a reference to the thread object that is used to run the interval_event.
+     */
     auto&
     thread() const noexcept
     {
         return thread_;
     }
+
+    /**
+     * Returns the interval at which the function is called, in milliseconds.
+     */
     auto&
     period() const noexcept
     {
         return period_;
     }
+
+    /**
+     * Returns the interval between checks for whether the function should be called, in milliseconds.
+     */
     auto&
     period_between_checks() const noexcept
     {
         return period_between_checks_;
     }
 
+    /**
+     * Sets the interval at which the function is called.
+     *
+     * @param val The new interval, in milliseconds.
+     */
     void
     period(time_type const& val) noexcept
     {
         period_ = val;
     }
+
+    /**
+     * Sets the interval between checks for whether the function should be called.
+     *
+     * @param val The new interval, in milliseconds.
+     */
     void
     period_between_checks(time_type const& val) noexcept
     {

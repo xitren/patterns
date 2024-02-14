@@ -18,32 +18,78 @@ public:
 
     virtual ~module() = default;
 
+    /**
+     * @brief The unique id of the module
+     */
     std::size_t const id_;
-    manager*          mediator_{};
 
+    /**
+     * @brief The pointer to the manager object
+     */
+    manager* mediator_{};
+
+    /**
+     * @brief The virtual function that is called when a message is received
+     *
+     * @param id the id of the message sender
+     * @param ptr the pointer to the message data
+     * @param sz the size of the message data
+     */
     virtual void
-    receive(std::size_t id, std::uint8_t*, std::size_t)
+    receive(std::size_t id, std::uint8_t* ptr, std::size_t sz)
         = 0;
 
 protected:
+    /**
+     * @brief The virtual function that is called to send a message
+     *
+     * @param ptr the pointer to the message data
+     * @param sz the size of the message data
+     */
     virtual void
-    send(std::uint8_t*, std::size_t)
+    send(std::uint8_t* ptr, std::size_t sz)
         = 0;
 };
 
 class manager {
 public:
-    manager()          = default;
+    /**
+     * @brief Construct a new manager object
+     */
+    manager() = default;
+
+    /**
+     * @brief Destroy the manager object
+     */
     virtual ~manager() = default;
 
+    /**
+     * @brief Add a module to the manager
+     *
+     * @param c the module to add
+     */
     virtual void
     add_module(module& c)
         = 0;
+
+    /**
+     * @brief Remove a module from the manager
+     *
+     * @param c the module to remove
+     */
     virtual void
     remove_module(module& c)
         = 0;
+
+    /**
+     * @brief Distribute a message to all modules
+     *
+     * @param sender the module that sent the message
+     * @param ptr the pointer to the message data
+     * @param sz the size of the message data
+     */
     virtual void
-    distribute(module const& sender, std::uint8_t*, std::size_t)
+    distribute(module const& sender, std::uint8_t* ptr, std::size_t sz)
         = 0;
 
 protected:
@@ -53,9 +99,18 @@ protected:
 template <class Data>
 class receiver_impl {
 public:
+    /**
+     * @brief This function is called when data is received
+     *
+     * @param data the data that was received
+     */
     virtual void
     data(Data const& data)
         = 0;
+
+    /**
+     * @brief Virtual destructor
+     */
     virtual ~receiver_impl() = default;
 };
 
@@ -65,8 +120,23 @@ class module : public base::module, public receiver_impl<Recvs>... {
     using size_type = std::size_t;
 
 public:
+    /**
+     * @brief Constructs a new module object
+     *
+     * @param m the reference to the manager object
+     */
     explicit module(base::manager& m) : base::module(typeid(Sends).name(), &m) { mediator_->add_module(*this); }
+
+    /**
+     * @brief Destroy the module object
+     */
     ~module() override { mediator_->remove_module(*this); }
+
+    /**
+     * @brief Sends a message to other modules
+     *
+     * @param field the message data
+     */
     void
     send(Sends field)
     {
@@ -75,6 +145,13 @@ public:
         send(cnv.pure.data(), cnv.pure.size());
     }
 
+    /**
+     * @brief This function is called when a message is received
+     *
+     * @param id the id of the message sender
+     * @param ptr the pointer to the message data
+     * @param sz the size of the message data
+     */
     void
     receive([[maybe_unused]] std::size_t const id, [[maybe_unused]] std::uint8_t* ptr,
             [[maybe_unused]] std::size_t sz) override
@@ -84,6 +161,12 @@ public:
     }
 
 protected:
+    /**
+     * @brief Sends a message to other modules
+     *
+     * @param ptr the pointer to the message data
+     * @param sz the size of the message data
+     */
     void
     send(std::uint8_t* ptr, std::size_t sz) override
     {
@@ -91,6 +174,13 @@ protected:
     }
 
 private:
+    /**
+     * @brief Converts a message data to a specific type
+     *
+     * @param ptr the pointer to the message data
+     * @param sz the size of the message data
+     * @return true if the conversion is successful, false otherwise
+     */
     template <class T>
     constexpr bool
     convert_field(std::uint8_t* ptr, std::size_t sz)
@@ -105,6 +195,15 @@ private:
         return true;
     }
 
+    /**
+     * @brief A helper function to convert a received message
+     *
+     * @tparam First the first type of the message
+     * @tparam Args the remaining types of the message
+     * @param id the id of the message sender
+     * @param ptr the pointer to the message data
+     * @param sz the size of the message data
+     */
     template <typename First, typename... Args>
     struct receiver_converter_helper {
         static constexpr void
@@ -119,6 +218,15 @@ private:
             }
         }
     };
+
+    /**
+     * @brief A helper function to convert a received message
+     *
+     * @tparam First the only type of the message
+     * @param id the id of the message sender
+     * @param ptr the pointer to the message data
+     * @param sz the size of the message data
+     */
     template <typename First>
     struct receiver_converter_helper<First> {
         static constexpr void
@@ -134,6 +242,11 @@ private:
         }
     };
 
+    /**
+     * @brief A union to hold a specific type of message
+     *
+     * @tparam T the type of the message
+     */
     template <typename T>
     union data_converter {
         T                                   fields;
@@ -144,14 +257,27 @@ private:
 template <std::size_t Sources>
 class manager : public base::manager {
 public:
+    /**
+     * @brief Destroys the manager object
+     */
     ~manager() override = default;
 
+    /**
+     * @brief Adds a module to the manager
+     *
+     * @param c the module to add
+     */
     void
     add_module(base::module& c) override
     {
         modules_[modules_cnt_++] = &c;
     }
 
+    /**
+     * @brief Removes a module from the manager
+     *
+     * @param c the module to remove
+     */
     void
     remove_module(base::module& c) override
     {
@@ -167,6 +293,11 @@ public:
         }
     }
 
+    /**
+     * @brief Sends a message to other modules
+     *
+     * @param data the message data
+     */
     template <class Data>
     void
     send(Data data)
@@ -180,10 +311,24 @@ public:
         }
     }
 
+    /**
+     * @brief This function is called when data is received
+     *
+     * @param id the id of the message sender
+     * @param ptr the pointer to the message data
+     * @param sz the size of the message data
+     */
     virtual void
     data(std::size_t /*id*/, std::uint8_t* /*ptr*/, std::size_t /*sz*/)
     {}
 
+    /**
+     * @brief Distributes a message to all modules
+     *
+     * @param sender the module that sent the message
+     * @param ptr the pointer to the message data
+     * @param sz the size of the message data
+     */
     void
     distribute(base::module const& sender, std::uint8_t* ptr, std::size_t sz) override
     {
@@ -195,6 +340,13 @@ public:
         }
     }
 
+    /**
+     * @brief Converts a message data to a specific type
+     *
+     * @param ptr the pointer to the message data
+     * @param sz the size of the message data
+     * @return T the converted message data
+     */
     template <class T>
     constexpr T
     convert_field(std::uint8_t* ptr, std::size_t sz)
@@ -210,9 +362,21 @@ public:
     }
 
 private:
+    /**
+     * @brief An array of pointers to the modules
+     */
     std::array<base::module*, Sources> modules_;
-    std::size_t                        modules_cnt_ = 0;
 
+    /**
+     * @brief The number of modules in the manager
+     */
+    std::size_t modules_cnt_ = 0;
+
+    /**
+     * @brief A union to hold a specific type of message
+     *
+     * @tparam T the type of the message
+     */
     template <typename T>
     union data_converter {
         T                                   fields;
