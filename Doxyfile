@@ -1,6 +1,6 @@
 PROJECT_NAME            = patterns_lib
-INPUT                   = include/xitren/comm/mediator.hpp include/xitren/comm/observer.hpp
-                          include/xitren/func/data.hpp include/xitren/func/fast_pimpl.hpp
+INPUT                   = include/xitren/comm/mediator.hpp include/xitren/comm/observer.hpp \
+                          include/xitren/func/data.hpp include/xitren/func/fast_pimpl.hpp \
                           include/xitren/func/internal_event.hpp
 OUTPUT_DIRECTORY        = docs
 OPTIMIZE_OUTPUT_FOR_C   = YES
