@@ -1,4 +1,0 @@
-[submodule "third_party/crc"]
-	path = third_party/crc
-	url = https://github.com/xitren/crc.git
-	tag = v1.0.1
