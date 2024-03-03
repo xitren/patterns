@@ -1,5 +1,5 @@
-#include <xitren/func/packet.hpp>
 #include <xitren/crc16.hpp>
+#include <xitren/func/packet.hpp>
 
 #include <gtest/gtest.h>
 
