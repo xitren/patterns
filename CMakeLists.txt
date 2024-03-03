@@ -24,7 +24,14 @@ target_compile_options(${LIBRARY_NAME} INTERFACE -std=c++20 -Wc++20-compat)
 target_include_directories(
         ${LIBRARY_NAME} INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_LIST_DIR}/include>)
 
-add_subdirectory(third_party/crc)
+include(FetchContent)
+FetchContent_Declare(
+		crc
+		GIT_REPOSITORY https://github.com/xitren/crc.git
+		GIT_TAG        v1.0.1
+)
+FetchContent_MakeAvailable(crc)
+
 target_link_libraries(${LIBRARY_NAME} INTERFACE ${GLOBAL_NAMESPACE}::crc_lib)
 
 message(STATUS "Adding library project \"${LIBRARY_NAME}\"")
