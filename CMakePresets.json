@@ -3,26 +3,240 @@
     "configurePresets": [
         {
             "name": "clang",
-            "displayName": "Clang 16.0.0 x86_64-w64-windows-gnu",
-            "description": "Using compilers: C = /mnt/c/MinGW/mingw64/bin/clang.exe, CXX = /mnt/c/MinGW/mingw64/bin/clang++.exe",
+            "hidden": true,
+            "displayName": "Clang 16.0.0 x86_64",
+            "description": "Using compilers: C = /usr/bin/clang.exe, CXX = /usr/bin/clang++.exe",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
-                "CMAKE_C_COMPILER": "/mnt/c/MinGW/mingw64/bin/clang.exe",
-                "CMAKE_CXX_COMPILER": "/mnt/c/MinGW/mingw64/bin/clang++.exe",
-                "CMAKE_BUILD_TYPE": "Debug"
+                "CMAKE_C_COMPILER": "/usr/bin/clang.exe",
+                "CMAKE_CXX_COMPILER": "/usr/bin/clang++.exe"
             }
         },
         {
-            "name": "gcc12",
-            "displayName": "GCC 12.3.0 x86_64-linux-gnu",
+            "name": "gcc-12",
+            "hidden": true,
+            "displayName": "GCC 12.3.0 x86_64",
             "description": "Using compilers: C = /usr/bin/gcc-12, CXX = /usr/bin/g++-12",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
                 "CMAKE_C_COMPILER": "/usr/bin/gcc-12",
-                "CMAKE_CXX_COMPILER": "/usr/bin/g++-12",
+                "CMAKE_CXX_COMPILER": "/usr/bin/g++-12"
+            }
+        },
+        {
+            "name": "config_host_debug",
+            "hidden": true,
+            "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug"
+            }
+        },
+        {
+            "name": "config_host_release",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release"
+            }
+        },
+        {
+            "name": "config_host_mac",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_OSX_DEPLOYMENT_TARGET": "11"
+            }
+        },
+        {
+            "name": "config_host_linux",
+            "hidden": true
+        },
+        {
+            "name": "config_host_debug_mac",
+            "hidden": true,
+            "inherits": [
+                "config_host_debug",
+                "config_host_mac"
+            ],
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            }
+        },
+        {
+            "name": "config_host_release_mac",
+            "hidden": true,
+            "inherits": [
+                "config_host_release",
+                "config_host_mac"
+            ],
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Darwin"
+            }
+        },
+        {
+            "name": "config_host_debug_linux",
+            "hidden": true,
+            "inherits": [
+                "config_host_debug",
+                "config_host_linux"
+            ],
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
+            "name": "config_host_release_linux",
+            "hidden": true,
+            "inherits": [
+                "config_host_release",
+                "config_host_linux"
+            ],
+            "condition": {
+                "type": "equals",
+                "lhs": "${hostSystemName}",
+                "rhs": "Linux"
+            }
+        },
+        {
+            "name": "clang_host_debug_mac",
+            "inherits": [
+                "config_host_debug_mac",
+                "clang"
+            ]
+        },
+        {
+            "name": "clang_host_release_mac",
+            "inherits": [
+                "config_host_release_mac",
+                "clang"
+            ]
+        },
+        {
+            "name": "clang_host_debug_linux",
+            "inherits": [
+                "config_host_debug_linux",
+                "clang"
+            ]
+        },
+        {
+            "name": "clang_host_release_linux",
+            "inherits": [
+                "config_host_release_linux",
+                "clang"
+            ]
+        },
+        {
+            "name": "gcc_host_debug_mac",
+            "inherits": [
+                "config_host_debug_mac",
+                "gcc-12"
+            ]
+        },
+        {
+            "name": "gcc_host_release_mac",
+            "inherits": [
+                "config_host_release_mac",
+                "gcc-12"
+            ]
+        },
+        {
+            "name": "gcc_host_debug_linux",
+            "inherits": [
+                "config_host_debug_linux",
+                "gcc-12"
+            ]
+        },
+        {
+            "name": "gcc_host_release_linux",
+            "inherits": [
+                "config_host_release_linux",
+                "gcc-12"
+            ]
+        },
+        {
+            "name": "Custom configure preset",
+            "displayName": "Custom configure preset",
+            "description": "Sets Ninja generator, build and install directory",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/out/build/${presetName}",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "gcc_host_debug_mac",
+            "displayName": "GCC 12 Debug Mac",
+            "configurePreset": "gcc_host_debug_mac"
+        },
+        {
+            "name": "gcc_host_release_mac",
+            "displayName": "GCC 12 Release Mac",
+            "configurePreset": "gcc_host_release_mac"
+        },
+        {
+            "name": "gcc_host_debug_linux",
+            "displayName": "GCC 12 Debug Linux",
+            "configurePreset": "gcc_host_debug_linux"
+        },
+        {
+            "name": "gcc_host_release_linux",
+            "displayName": "GCC 12 Release Linux",
+            "configurePreset": "gcc_host_release_linux"
+        },
+        {
+            "name": "clang_host_debug_mac",
+            "displayName": "Clang Debug Mac",
+            "configurePreset": "clang_host_debug_mac"
+        },
+        {
+            "name": "clang_host_release_mac",
+            "displayName": "Clang Release Mac",
+            "configurePreset": "clang_host_release_mac"
+        },
+        {
+            "name": "clang_host_debug_linux",
+            "displayName": "Clang Debug Linux",
+            "configurePreset": "clang_host_debug_linux"
+        },
+        {
+            "name": "clang_host_release_linux",
+            "displayName": "Clang Release Linux",
+            "configurePreset": "clang_host_release_linux"
+        }
+    ],
+    "testPresets": [
+        {
+            "name": "tests_host_all_mac",
+            "displayName": "Host All Mac",
+            "configurePreset": "gcc_host_release_mac",
+            "output": {
+                "outputOnFailure": true,
+                "verbosity": "extra"
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": true
+            }
+        },
+        {
+            "name": "tests_host_all_linux",
+            "displayName": "Host All Linux",
+            "configurePreset": "gcc_host_release_linux",
+            "output": {
+                "outputOnFailure": true,
+                "verbosity": "extra"
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": true
             }
         }
     ]
