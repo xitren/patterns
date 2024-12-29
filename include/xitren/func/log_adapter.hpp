@@ -15,13 +15,13 @@ __ _(_) |_ _ _ ___ _ _
 
 namespace xitren::func {
 
-// template <typename T>
-// concept log_adapter_concept = requires {
-//     // T::trace(auto&& data);
-//     // T::debug(auto&& data);
-//     // T::warning(auto&& data);
-//     // T::error(auto&& data);
-//     // T::trace(auto&& data);
-// };
+template <typename T>
+concept log_adapter_concept = requires {
+    T::trace();
+    T::debug();
+    T::warning();
+    T::error();
+    T::trace();
+};
 
 }    // namespace xitren::func
