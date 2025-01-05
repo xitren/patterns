@@ -64,7 +64,7 @@ public:
     }
 };
 
-TEST(connector_test, basic_two_observe)
+TEST(observer_test, basic_two_observe)
 {
     test_observer              obs1;
     test_observer              obs2;
@@ -77,7 +77,7 @@ TEST(connector_test, basic_two_observe)
     EXPECT_EQ(obs1.get(), 1);
 }
 
-TEST(connector_test, basic_add_observe)
+TEST(observer_test, basic_add_observe)
 {
     test_observer              obs1;
     observable<uint8_t, false> res1;
@@ -88,7 +88,7 @@ TEST(connector_test, basic_add_observe)
     EXPECT_EQ(obs1.get(), 1);
 }
 
-TEST(connector_test, basic_add_observe_multi)
+TEST(observer_test, basic_add_observe_multi)
 {
     test_observer              obs1;
     test_observer              obs2;
@@ -108,7 +108,7 @@ TEST(connector_test, basic_add_observe_multi)
     EXPECT_EQ(obs4.get(), 1);
 }
 
-TEST(connector_test, basic_add_observe_multi_diff)
+TEST(observer_test, basic_add_observe_multi_diff)
 {
     test_observer        obs1;
     test_observer        obs2;
