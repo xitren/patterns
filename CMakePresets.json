@@ -5,24 +5,24 @@
             "name": "clang",
             "hidden": true,
             "displayName": "Clang 16.0.0 x86_64",
-            "description": "Using compilers: C = /usr/bin/clang.exe, CXX = /usr/bin/clang++.exe",
+            "description": "Using compilers: C = clang, CXX = clang++",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
-                "CMAKE_C_COMPILER": "/usr/bin/clang.exe",
-                "CMAKE_CXX_COMPILER": "/usr/bin/clang++.exe"
+                "CMAKE_C_COMPILER": "clang",
+                "CMAKE_CXX_COMPILER": "clang++"
             }
         },
         {
             "name": "gcc-12",
             "hidden": true,
             "displayName": "GCC 12.3.0 x86_64",
-            "description": "Using compilers: C = /usr/bin/gcc-12, CXX = /usr/bin/g++-12",
+            "description": "Using compilers: C = gcc-12, CXX = g++-12",
             "binaryDir": "${sourceDir}/out/build/${presetName}",
             "cacheVariables": {
                 "CMAKE_INSTALL_PREFIX": "${sourceDir}/out/install/${presetName}",
-                "CMAKE_C_COMPILER": "/usr/bin/gcc-12",
-                "CMAKE_CXX_COMPILER": "/usr/bin/g++-12"
+                "CMAKE_C_COMPILER": "gcc-12",
+                "CMAKE_CXX_COMPILER": "g++-12"
             }
         },
         {
