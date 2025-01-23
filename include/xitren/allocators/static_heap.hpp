@@ -75,9 +75,7 @@ class static_heap {
     x_task_resume_all()
     {}
 
-    constexpr void
-    config_assert(auto n)
-    {}
+    constexpr void config_assert(auto) {}
 
     /* Canary value for protecting internal heap pointers. */
     static constexpr std::size_t x_heap_canary{0x655556UL};

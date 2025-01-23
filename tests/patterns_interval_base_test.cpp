@@ -2,6 +2,7 @@
 
 #include <gtest/gtest.h>
 
+#include <chrono>
 #include <iostream>
 
 using namespace xitren::func;
@@ -14,7 +15,8 @@ TEST(interval_test, simple_check)
     interval_event             a(
         [&]() {
             cnt++;
-            std::cout << duration_cast<milliseconds>(system_clock::now() - start_time) << std::endl;
+            std::chrono::milliseconds ms = duration_cast<milliseconds>(system_clock::now() - start_time);
+            std::cout << ms.count() << std::endl;
         },
         100ms, 1ms);
     std::this_thread::sleep_for(2s);
@@ -30,7 +32,8 @@ TEST(interval_test, stop_check)
     interval_event             a(
         [&]() {
             cnt++;
-            std::cout << duration_cast<milliseconds>(system_clock::now() - start_time) << std::endl;
+            std::chrono::milliseconds ms = duration_cast<milliseconds>(system_clock::now() - start_time);
+            std::cout << ms.count() << std::endl;
         },
         100ms, 1ms);
     std::this_thread::sleep_for(1s);
@@ -53,7 +56,8 @@ TEST(interval_test, interval_change_check)
             if (cnt++ >= change_count) {
                 a.period(50ms);
             }
-            std::cout << duration_cast<milliseconds>(system_clock::now() - start_time) << std::endl;
+            std::chrono::milliseconds ms = duration_cast<milliseconds>(system_clock::now() - start_time);
+            std::cout << ms.count() << std::endl;
         },
         100ms, 1ms);
     std::this_thread::sleep_for(2s);

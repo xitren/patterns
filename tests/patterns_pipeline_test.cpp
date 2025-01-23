@@ -40,7 +40,7 @@ TEST(pipeline_test, basic)
     using pipeline_type = pipeline_stage<std::string, std::string, 1024, LogCout>;
     std::atomic<int> i{};
     static auto      func
-        = [&](pipeline_stage_exception ex, const std::string str, const std::pair<int, int> stat) -> const std::string {
+        = [&](pipeline_stage_exception, const std::string str, const std::pair<int, int>) -> const std::string {
         LogCout::debug() << "String: " << str << "\n";
         i++;
         return str;
@@ -59,7 +59,7 @@ TEST(pipeline_test, basic_void_ret)
 {
     using pipeline_type = pipeline_stage<std::string, void, 1024, LogCout>;
     std::atomic<int> i{};
-    static auto func = [&](pipeline_stage_exception ex, const std::string str, const std::pair<int, int> stat) -> void {
+    static auto func = [&](pipeline_stage_exception, const std::string str, const std::pair<int, int> stat) -> void {
         LogCout::debug() << "String: " << str << " Time: " << stat.first << " Util: " << stat.second << "\n";
         using namespace std::chrono;
         i++;
@@ -82,7 +82,7 @@ TEST(pipeline_test, basic_pool_test)
 {
     using pipeline_type = pipeline_stage_pool<std::string, void, 1024, 8, LogCout>;
     std::atomic<int> i{};
-    static auto      func = [&](pipeline_stage_exception ex, const std::string str, const measure_data stat) -> void {
+    static auto      func = [&](pipeline_stage_exception, const std::string str, const measure_data stat) -> void {
         LogCout::debug() << "String: " << str << " ID: " << stat.id << " Time: " << stat.time << " Util: " << stat.load
                          << "\n";
         using namespace std::chrono;

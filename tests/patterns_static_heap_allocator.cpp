@@ -210,8 +210,8 @@ TEST(TestStaticHeap, AdvancedSTLVectorTest)
 
 TEST(TestStaticHeap, TestListPushAndInsert)
 {
-    constexpr std::size_t                           val   = 4096;
-    int const                                       count = 64;
+    constexpr std::size_t val = 4096;
+    // int const                                       count = 64;
     static_heap<val>                                manager{};
     static_heap_allocator<int, val>                 list_all{manager};
     std::list<int, static_heap_allocator<int, val>> list{list_all};
@@ -244,8 +244,8 @@ TEST(TestStaticHeap, TestListPushAndInsert)
 
 TEST(TestStaticHeap, TestSet)
 {
-    constexpr std::size_t                                          val   = 4096;
-    int const                                                      count = 64;
+    constexpr std::size_t val = 4096;
+    // int const                                                      count = 64;
     static_heap<val>                                               manager{};
     static_heap_allocator<int, val>                                list_all{manager};
     std::set<int, std::less<int>, static_heap_allocator<int, val>> set{list_all};
@@ -271,11 +271,11 @@ TEST(TestStaticHeap, TestSet)
 
 TEST(TestStaticHeap, TestUnorderedMap)
 {
-    constexpr std::size_t val   = 1024;
-    int const             count = 64;
-    using key_type              = int;
-    using value_type            = int;
-    using alloc_type            = std::pair<key_type const, value_type>;
+    constexpr std::size_t val = 1024;
+    // int const             count = 64;
+    using key_type   = int;
+    using value_type = int;
+    using alloc_type = std::pair<key_type const, value_type>;
     static_heap<val>                       manager{};
     static_heap_allocator<alloc_type, val> list_all{manager};
     std::unordered_map<key_type, value_type, std::hash<key_type>, std::equal_to<key_type>,

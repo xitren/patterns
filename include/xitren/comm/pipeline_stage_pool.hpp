@@ -93,7 +93,7 @@ public:
 #endif
         };
 
-        for (int i{}; i < pool_size_; i++) {
+        for (std::size_t i{}; i < pool_size_; i++) {
             pool_threads_.push_back(std::thread(thread, i));
         }
     }
@@ -161,9 +161,9 @@ private:
     int
     min_thread()
     {
-        int min{std::numeric_limits<int>::max()};
-        int min_i{0};
-        int i{};
+        std::size_t min{std::numeric_limits<int>::max()};
+        int         min_i{0};
+        int         i{};
         for (auto& item : pool_) {
             auto const size{item.tail - item.head};
             if (min > size) {

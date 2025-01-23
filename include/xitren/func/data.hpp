@@ -25,7 +25,7 @@ namespace xitren::func {
 /// size.
 ///
 /// @return true if the current CPU is little endian, false otherwise.
-static consteval bool
+static constexpr bool
 is_lsb()
 {
     std::uint16_t               test{0x3322};

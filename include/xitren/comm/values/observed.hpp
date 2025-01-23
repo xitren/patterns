@@ -72,7 +72,7 @@ public:
 
 protected:
     void
-    data(void const* src, T const& nd)
+    data(void const* /*src*/, T const& nd)
     {
         std::atomic<T>::store(nd);
         if (function_) {

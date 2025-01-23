@@ -8,13 +8,16 @@
 using namespace xitren::comm;
 
 class data1 {
+public:
     int i1;
 };
 class data2 {
+public:
     int i1;
     int i2;
 };
 class data3 {
+public:
     int i1;
     int i2;
 };

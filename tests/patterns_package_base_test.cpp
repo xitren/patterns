@@ -33,7 +33,7 @@ public:
      * @return The calculated CRC-16 ANSI checksum
      */
     template <std::size_t Size>
-    static consteval value_type
+    static constexpr value_type
     calculate(std::array<std::uint8_t, Size> const& data) noexcept
     {
         return xitren::crc::crc16::calculate(data);
