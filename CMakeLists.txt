@@ -10,7 +10,7 @@ set(GLOBAL_NAMESPACE
 
 project(${LIBRARY_NAME}
 	DESCRIPTION "Patterns library"
-    VERSION 1.0.4
+    VERSION 1.0.6
 	LANGUAGES CXX
 )
 

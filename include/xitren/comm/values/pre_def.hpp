@@ -16,7 +16,7 @@ __ _(_) |_ _ _ ___ _ _
 
 namespace xitren::comm::values {
 
-template <class T, std::size_t Max = 1>
+template <class T, std::size_t Max>
 class observable;
 
 }    // namespace xitren::comm::values
