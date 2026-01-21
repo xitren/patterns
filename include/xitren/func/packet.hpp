@@ -7,140 +7,122 @@ __ _(_) |_ _ _ ___ _ _
 */
 #pragma once
 
-#include <xitren/crc_concept.hpp>
 #include <xitren/func/data.hpp>
 
+#include <algorithm>
 #include <array>
+#include <concepts>
 #include <cstdint>
+#include <iterator>
+#include <tuple>
+#include <utility>
 
 namespace xitren::func {
 
 template <typename T>
 concept crc_concept = requires {
     typename T::value_type;
-    T::calculate(std::array<std::uint8_t, 8>::iterator{nullptr},
-                 std::array<std::uint8_t, 8>::iterator{reinterpret_cast<unsigned char*>(10)});
 };
 
 template <typename Header, typename Fields, crc_concept Crc>
-union packet {
+class packet {
     using size_type                   = std::size_t;
-    static constexpr size_type length = (sizeof(Header) + sizeof(Fields) + sizeof(typename Crc::value_type));
-    // clang-format off
-    using struct_type                 = struct __attribute__((__packed__)) {
-        Header                   header;
-        Fields                   fields;
-        typename Crc::value_type crc;
-    };
-    // clang-format on
-    using struct_nocrc_type = struct __attribute__((__packed__)) {
-        Header header;
-        Fields fields;
-    };
-    using array_type = std::array<std::uint8_t, sizeof(struct_type)>;
+    using crc_type                    = typename Crc::value_type;
+    static constexpr size_type length = (sizeof(Header) + sizeof(Fields) + sizeof(crc_type));
+
+    using array_type = std::array<std::uint8_t, length>;
 
 public:
-    explicit constexpr packet(std::array<uint8_t, length> const&& array) noexcept : pure_{std::move(array)} {}
+    explicit constexpr packet(array_type const& array) noexcept : bytes_{array} {}
+    explicit constexpr packet(array_type&& array) noexcept : bytes_{std::move(array)} {}
 
     template <std::input_iterator InputIterator>
-    explicit constexpr packet(InputIterator begin) noexcept : pure_{}
+    explicit constexpr packet(InputIterator begin) noexcept : bytes_{}
     {
-        std::copy(begin, begin + length, pure_.begin());
+        for (size_type i{}; i < length; ++i, ++begin) {
+            bytes_[i] = static_cast<std::uint8_t>(*begin);
+        }
     }
 
-    constexpr packet() noexcept : pure_{} {}
+    constexpr packet() noexcept : bytes_{} {}
 
-    constexpr packet(Header const& header, Fields const& fields) noexcept : fields_{header, fields, {}}
+    constexpr packet(Header const& header, Fields const& fields) noexcept : bytes_{serialize(header, fields)}
     {
-        fields_.crc = Crc::calculate(pure_.begin(), pure_.end() - sizeof(typename Crc::value_type));
     }
 
-    Header&
-    header() noexcept
-    {
-        return fields_.header;
-    }
-
-    constexpr Header&
+    [[nodiscard]] constexpr Header
     header() const noexcept
     {
-        return fields_.header;
+        return data<Header>::deserialize(bytes_.begin());
     }
 
-    constexpr Fields&
+    [[nodiscard]] constexpr Fields
     fields() const noexcept
     {
-        return fields_.fields;
+        return data<Fields>::deserialize(bytes_.begin() + sizeof(Header));
     }
 
-    Fields&
-    fields() noexcept
-    {
-        return fields_.fields;
-    }
-
-    Crc&
-    crc() noexcept
-    {
-        return fields_.crc;
-    }
-
-    constexpr Crc&
+    [[nodiscard]] constexpr crc_type
     crc() const noexcept
     {
-        return fields_.crc;
+        return data<crc_type>::deserialize(bytes_.begin() + sizeof(Header) + sizeof(Fields));
     }
 
     constexpr bool
-    valid() noexcept
+    valid() const noexcept
     {
-        return (fields_.crc == Crc::calculate(pure_.begin(), pure_.end() - sizeof(typename Crc::value_type)));
+        auto const calc = Crc::calculate(bytes_.begin(), bytes_.begin() + sizeof(Header) + sizeof(Fields));
+        return crc() == calc;
     }
 
     constexpr array_type
     to_array() const noexcept
     {
-        return pure_;
+        return bytes_;
     }
 
     static constexpr array_type
     serialize(Header const& header, Fields const& fields) noexcept
     {
-        auto data_tr = data<struct_nocrc_type>::serialize({header, fields});
-        auto crc     = Crc::calculate(data_tr.begin(), data_tr.end());
-        return data<struct_type>::serialize({header, fields, crc});
+        array_type out{};
+        data<Header>::serialize(header, out.begin());
+        data<Fields>::serialize(fields, out.begin() + sizeof(Header));
+        auto const crc = Crc::calculate(out.begin(), out.begin() + sizeof(Header) + sizeof(Fields));
+        data<crc_type>::serialize(crc, out.begin() + sizeof(Header) + sizeof(Fields));
+        return out;
     }
 
     template <std::size_t Size>
     static constexpr std::tuple<bool, Header, Fields>
     deserialize(std::array<std::uint8_t, Size> const& array) noexcept
     {
-        auto [header, fields, crc] = data<struct_type>::serialize(array);
-        std::array<std::uint8_t, Size - sizeof(Crc::value_type)> checker;
-        auto                                                     calc_crc = Crc::calculate(checker);
-        return {crc == calc_crc, header, fields};
+        static_assert(Size >= length);
+        auto const header_v = data<Header>::deserialize(array.begin());
+        auto const fields_v = data<Fields>::deserialize(array.begin() + sizeof(Header));
+        auto const crc_v    = data<crc_type>::deserialize(array.begin() + sizeof(Header) + sizeof(Fields));
+        auto const calc     = Crc::calculate(array.begin(), array.begin() + sizeof(Header) + sizeof(Fields));
+        return {crc_v == calc, header_v, fields_v};
     }
 
     template <typename InputIterator>
     static constexpr packet
     deserialize(InputIterator begin) noexcept
     {
-        data<packet> tt{};
-        std::copy(begin, begin + length, tt.pure.begin());
-        return tt.fields;
+        return packet{begin};
     }
 
-    template <std::output_iterator<std::uint8_t> InputIterator>
+    template <std::output_iterator<std::uint8_t> OutputIterator>
     static constexpr void
-    serialize(packet const& type, InputIterator begin) noexcept
+    serialize(packet const& type, OutputIterator begin) noexcept
     {
-        data<packet> tt{type};
-        std::copy(tt.pure.begin(), tt.pure.end(), begin);
+        auto const bytes = type.to_array();
+        for (auto b : bytes) {
+            *begin++ = b;
+        }
     }
 
 private:
-    struct_type fields_;
-    array_type  pure_;
+    array_type bytes_;
 };
 
 template <std::size_t Max>
@@ -184,9 +166,9 @@ public:
         static_assert(sizeof(Type) != 0);
         static_assert(Max >= length);
         size_type const variable_part = (size_ - length) / sizeof(Type);
-        auto            header_conv   = reinterpret_cast<Header const*>(storage_.begin());
-        auto            fields_conv   = reinterpret_cast<Fields const*>(storage_.begin() + sizeof(Header));
-        auto            data_conv = reinterpret_cast<Type const*>(storage_.begin() + sizeof(Header) + sizeof(Fields));
+        auto header_conv = reinterpret_cast<Header const*>(storage_.data());
+        auto fields_conv = reinterpret_cast<Fields const*>(storage_.data() + sizeof(Header));
+        auto data_conv   = reinterpret_cast<Type const*>(storage_.data() + sizeof(Header) + sizeof(Fields));
         return return_type{header_conv, fields_conv, variable_part, data_conv};
     }
 

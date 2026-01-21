@@ -9,10 +9,10 @@ __ _(_) |_ _ _ ___ _ _
 
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
 #include <functional>
 #include <thread>
 #include <utility>
-using namespace std::literals;
 
 namespace xitren::func {
 
@@ -38,25 +38,45 @@ public:
      * @param wait_between_checks The interval between checks for whether the function should be called, in
      * milliseconds.
      */
-    interval_event(std::function<void(void)> function, time_type repeat_every = 100ms,
-                   time_type wait_between_checks = 20ms)
-        : function_{std::move(function)},
-          thread_{[&] {
-              std::this_thread::sleep_for(10ms);
-              auto last_time{std::chrono::system_clock::now()};
-              while (keep_running_.test_and_set()) {
-                  if ((std::chrono::system_clock::now() - last_time).count() >= period_.count()) {
-                      last_time += period_;
-                      function_();
-                  }
-                  std::this_thread::sleep_for(period_between_checks_);
-              }
-              keep_running_.notify_one();
-          }},
-          period_{repeat_every},
-          period_between_checks_{wait_between_checks}
+    interval_event(std::function<void(void)> function, time_type repeat_every = time_type{100},
+                   time_type wait_between_checks = time_type{20})
+        : function_{std::move(function)}
     {
-        thread_.detach();
+        period_ms_.store(repeat_every.count(), std::memory_order_relaxed);
+        check_ms_.store(wait_between_checks.count(), std::memory_order_relaxed);
+        thread_ = std::thread([this]() {
+            using clock = std::chrono::steady_clock;
+            auto last_time = clock::now();
+            while (running_.load(std::memory_order_acquire)) {
+                auto period = time_type{period_ms_.load(std::memory_order_relaxed)};
+                if (period.count() <= 0) {
+                    period = time_type{1};
+                }
+                auto const next_time = last_time + period;
+                {
+                    std::unique_lock<std::mutex> lock(mtx_);
+                    cv_.wait_until(lock, next_time, [&] { return !running_.load(std::memory_order_acquire); });
+                }
+                if (!running_.load(std::memory_order_acquire)) {
+                    break;
+                }
+
+                // Catch up if we were delayed (or if period was changed inside callback).
+                int guard = 0;
+                while (running_.load(std::memory_order_acquire) && guard++ < 100) {
+                    period = time_type{period_ms_.load(std::memory_order_relaxed)};
+                    if (period.count() <= 0) {
+                        period = time_type{1};
+                    }
+                    auto const target = last_time + period;
+                    if (clock::now() < target) {
+                        break;
+                    }
+                    last_time = target;
+                    function_();
+                }
+            }
+        });
     }
 
     /**
@@ -70,10 +90,12 @@ public:
     void
     stop()
     {
-        if (!stop_) {
-            keep_running_.clear();
-            keep_running_.wait(false);
-            stop_ = true;
+        bool expected = true;
+        if (running_.compare_exchange_strong(expected, false, std::memory_order_acq_rel)) {
+            cv_.notify_all();
+            if (thread_.joinable()) {
+                thread_.join();
+            }
         }
     }
 
@@ -92,7 +114,8 @@ public:
     auto&
     period() const noexcept
     {
-        return period_;
+        period_cache_ = time_type{period_ms_.load(std::memory_order_relaxed)};
+        return period_cache_;
     }
 
     /**
@@ -101,7 +124,8 @@ public:
     auto&
     period_between_checks() const noexcept
     {
-        return period_between_checks_;
+        check_cache_ = time_type{check_ms_.load(std::memory_order_relaxed)};
+        return check_cache_;
     }
 
     /**
@@ -112,7 +136,7 @@ public:
     void
     period(time_type const& val) noexcept
     {
-        period_ = val;
+        period_ms_.store(val.count(), std::memory_order_relaxed);
     }
 
     /**
@@ -123,16 +147,19 @@ public:
     void
     period_between_checks(time_type const& val) noexcept
     {
-        period_between_checks_ = val;
+        check_ms_.store(val.count(), std::memory_order_relaxed);
     }
 
 private:
     std::function<void(void)> function_;
-    std::atomic_flag          keep_running_{true};
-    std::thread               thread_;
-    time_type                 period_{};
-    time_type                 period_between_checks_{};
-    bool                      stop_{false};
+    std::atomic<bool>         running_{true};
+    std::thread               thread_{};
+    std::mutex                mtx_{};
+    std::condition_variable   cv_{};
+    std::atomic<time_type::rep> period_ms_{0};
+    std::atomic<time_type::rep> check_ms_{0};
+    mutable time_type         period_cache_{};
+    mutable time_type         check_cache_{};
 };
 
 }    // namespace xitren::func

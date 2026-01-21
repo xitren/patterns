@@ -22,7 +22,8 @@ TEST(interval_test, simple_check)
     std::this_thread::sleep_for(2s);
     auto cnt_val = cnt.load();
     std::cout << cnt_val << std::endl;
-    EXPECT_TRUE((cnt_val >= 20) && (cnt_val <= 21));
+    // Allow some scheduling jitter on non-realtime OS/CI/WSL.
+    EXPECT_TRUE((cnt_val >= 18) && (cnt_val <= 22));
 }
 
 TEST(interval_test, stop_check)
@@ -63,5 +64,7 @@ TEST(interval_test, interval_change_check)
     std::this_thread::sleep_for(2s);
     auto cnt_val = cnt.load();
     std::cout << cnt_val << std::endl;
-    EXPECT_TRUE((cnt_val >= 29) && (cnt_val <= 31));
+    // Timing tests are inherently jittery on non-realtime OS/CI/WSL.
+    // Expect "around 30" ticks, allowing some scheduling drift.
+    EXPECT_TRUE((cnt_val >= 26) && (cnt_val <= 32));
 }

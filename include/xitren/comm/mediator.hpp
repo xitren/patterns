@@ -9,10 +9,14 @@ __ _(_) |_ _ _ ___ _ _
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <string>
 #include <typeinfo>
+#include <type_traits>
 #include <utility>
 #include <variant>
+
+#include <xitren/func/data.hpp>
 
 namespace xitren::comm {
 
@@ -147,9 +151,10 @@ public:
     void
     send(Sends field)
     {
-        data_converter<Sends> cnv{};
-        cnv.fields = field;
-        send(cnv.pure.data(), cnv.pure.size());
+        static_assert(std::is_trivially_copyable_v<Sends>,
+                      "mediator message types must be trivially copyable (byte-serializable)");
+        auto cnv = xitren::func::data<Sends>::serialize(field);
+        send(cnv.data(), cnv.size());
     }
 
     /**
@@ -192,13 +197,12 @@ private:
     constexpr bool
     convert_field(std::uint8_t* ptr, std::size_t sz)
     {
-        data_converter<T> cnv = {};
-        if (cnv.pure.size() != sz)
+        static_assert(std::is_trivially_copyable_v<T>,
+                      "mediator message types must be trivially copyable (byte-serializable)");
+        if (sizeof(T) != sz)
             return false;
-        for (auto& item : cnv.pure) {
-            item = *(ptr++);
-        }
-        this->data(cnv.fields);
+        auto const val = xitren::func::data<T>::deserialize(ptr);
+        this->data(val);
         return true;
     }
 
@@ -249,16 +253,6 @@ private:
         }
     };
 
-    /**
-     * @brief A union to hold a specific type of message
-     *
-     * @tparam T the type of the message
-     */
-    template <typename T>
-    union data_converter {
-        T                                   fields;
-        std::array<std::uint8_t, sizeof(T)> pure;
-    };
 };
 
 template <std::size_t Sources>
@@ -309,11 +303,13 @@ public:
     void
     send(Data data)
     {
+        static_assert(std::is_trivially_copyable_v<Data>,
+                      "mediator message types must be trivially copyable (byte-serializable)");
         for (std::size_t i = 0; i < modules_cnt_; i++) {
             std::size_t          loc_id = std::hash<std::string>{}(typeid(Data).name());
-            data_converter<Data> cnv    = {data};
             if (modules_.at(i)->id_ != loc_id) {
-                modules_.at(i)->receive(loc_id, cnv.pure.data(), cnv.pure.size());
+                auto cnv = xitren::func::data<Data>::serialize(data);
+                modules_.at(i)->receive(loc_id, cnv.data(), cnv.size());
             }
         }
     }
@@ -358,14 +354,12 @@ public:
     constexpr T
     convert_field(std::uint8_t* ptr, std::size_t sz)
     {
-        data_converter<T> cnv = {};
-        if (cnv.pure.size() != sz) {
+        static_assert(std::is_trivially_copyable_v<T>,
+                      "mediator message types must be trivially copyable (byte-serializable)");
+        if (sizeof(T) != sz) {
             throw std::exception();
         }
-        for (auto& item : cnv.pure) {
-            item = *(ptr++);
-        }
-        return cnv.fields;
+        return xitren::func::data<T>::deserialize(ptr);
     }
 
 private:
@@ -379,16 +373,6 @@ private:
      */
     std::size_t modules_cnt_ = 0;
 
-    /**
-     * @brief A union to hold a specific type of message
-     *
-     * @tparam T the type of the message
-     */
-    template <typename T>
-    union data_converter {
-        T                                   fields;
-        std::array<std::uint8_t, sizeof(T)> pure;
-    };
 };
 
 }    // namespace xitren::comm

@@ -21,7 +21,7 @@ concept log_adapter_concept = requires {
     T::debug();
     T::warning();
     T::error();
-    T::trace();
+    T::critical();
 };
 
 }    // namespace xitren::func

@@ -80,7 +80,7 @@ public:
     /**
      * @brief Destroys the observable object
      */
-    virtual ~observable() noexcept { clear_observers(); }
+    virtual ~observable() noexcept { forget_observers(); }
 
     /**
      * @brief Adds an observer to the observable object
@@ -133,10 +133,8 @@ public:
     inline void
     clear_observers() noexcept
     {
-        for (auto& item : std::views::counted(observers_.begin(), count_)) {
-            item->disconnect(static_cast<void*>(this));
-        }
-        count_ = 0;
+        // Safe clear: observers are non-owning pointers and may already be destroyed.
+        forget_observers();
     }
 
     /**
@@ -192,6 +190,12 @@ private:
         }
         return false;
     }
+
+    inline void
+    forget_observers() noexcept
+    {
+        count_ = 0;
+    }
 };
 
 template <typename T, std::size_t Max>
@@ -241,7 +245,7 @@ public:
     /**
      * @brief Destructor
      */
-    virtual ~observable() noexcept { clear_observers(); }
+    virtual ~observable() noexcept { forget_observers(); }
 
     /**
      * @brief Add an observer to the observable
@@ -292,10 +296,8 @@ public:
 #ifdef PTHREAD_MUTEX_DEFAULT
         std::unique_lock<std::mutex> lock(access_);
 #endif
-        for (auto& item : observers_) {
-            item->disconnect(static_cast<void*>(this));
-        }
-        observers_.clear();
+        // Safe clear: observers are non-owning pointers and may already be destroyed.
+        forget_observers();
     }
 
     /**
@@ -338,6 +340,12 @@ private:
                 return true;
         }
         return false;
+    }
+
+    inline void
+    forget_observers() noexcept
+    {
+        observers_.clear();
     }
 };
 template <typename T>

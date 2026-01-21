@@ -1,11 +1,12 @@
 #pragma once
 
+#include <charconv>
 #include <functional>
-#include <map>
 #include <memory>
-#include <sstream>
 #include <string>
 #include <string_view>
+#include <type_traits>
+#include <unordered_map>
 #include <variant>
 #include <vector>
 
@@ -34,9 +35,49 @@ struct argv_parser : Opts {
     parse(int argc, char const* argv[])
     {
         std::vector<std::string_view> vargv(argv, argv + argc);
-        for (int idx = 0; idx < argc; ++idx)
-            for (auto& cbk : callbacks_)
-                cbk.second(idx, vargv);
+        for (int idx = 0; idx < argc; ++idx) {
+            auto it = args_.find(std::string(vargv[idx]));
+            if (it == args_.end()) {
+                continue;
+            }
+            auto const& prop = it->second;
+            if (prop.index() == 3) {
+                this->*std::get<3>(prop) = true;
+                continue;
+            }
+            if (idx >= static_cast<int>(vargv.size() - 1)) {
+                continue;
+            }
+            auto const val = vargv[idx + 1];
+            std::visit(
+                [this, val](auto&& member) {
+                    using member_t = std::decay_t<decltype(member)>;
+                    if constexpr (std::is_same_v<member_t, std::string Opts::*>) {
+                        this->*member = std::string(val);
+                    } else if constexpr (std::is_same_v<member_t, int Opts::*>) {
+                        int out{};
+                        auto [p, ec] = std::from_chars(val.data(), val.data() + val.size(), out);
+                        if (ec == std::errc{} && p == val.data() + val.size()) {
+                            this->*member = out;
+                        }
+                    } else if constexpr (std::is_same_v<member_t, double Opts::*>) {
+                        double out{};
+                        auto [p, ec] = std::from_chars(val.data(), val.data() + val.size(), out);
+                        if (ec == std::errc{} && p == val.data() + val.size()) {
+                            this->*member = out;
+                        } else {
+                            // Fallback (slower, but portable)
+                            try {
+                                this->*member = std::stod(std::string(val));
+                            } catch (...) {
+                            }
+                        }
+                    } else {
+                        // bool handled above
+                    }
+                },
+                prop);
+        }
         return static_cast<Opts>(*this);
     }
 
@@ -50,8 +91,7 @@ struct argv_parser : Opts {
     }
 
 private:
-    using callback_t = std::function<void(int, std::vector<std::string_view> const&)>;
-    std::map<std::string, callback_t> callbacks_;
+    std::unordered_map<std::string, parameter_type> args_;
 
     argv_parser() = default;
 
@@ -64,23 +104,7 @@ private:
     auto
     register_callback(std::string const& name, parameter_type prop)
     {
-        callbacks_[name] = [this, name, prop](int idx, std::vector<std::string_view> const& argv) {
-            if (argv[idx] == name) {
-                if (prop.index() == 3) {
-                    this->*std::get<3>(prop) = true;
-                    return;
-                }
-                visit(
-                    [this, idx, &argv](auto&& arg) {
-                        if (idx < static_cast<int>(argv.size() - 1)) {
-                            std::stringstream value;
-                            value << argv[idx + 1];
-                            value >> this->*arg;
-                        }
-                    },
-                    prop);
-            }
-        };
+        args_[name] = prop;
     };
 };
 

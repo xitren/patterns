@@ -14,6 +14,7 @@ RUN apk --no-cache add "gcc-arm-none-eabi==12.2.0-r8"
 RUN apk --no-cache add "g++-arm-none-eabi==12.2.0-r1"
 RUN apk --no-cache add "gcc==12.2.1_git20220924-r10"
 RUN apk --no-cache add "g++==12.2.1_git20220924-r10"
+RUN apk --no-cache add compiler-rt
 
 RUN ln -s /usr/bin/gcc /usr/bin/gcc-12
 RUN ln -s /usr/bin/g++ /usr/bin/g++-12

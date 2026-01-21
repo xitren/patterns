@@ -10,86 +10,69 @@ __ _(_) |_ _ _ ___ _ _
 #include <array>
 #include <concepts>
 #include <cstdint>
+#include <cstring>
+#if defined(__cpp_lib_endian)
+#include <bit>
+#endif
+#include <type_traits>
+#include <utility>
 
 namespace xitren::func {
 
-/// Returns true if the current CPU is little endian, false otherwise.
-///
-/// This function uses a compile-time constant expression to determine if the current CPU is little endian. It does so
-/// by creating a 16-bit integer value with the least and most significant bytes swapped, and then checking if the least
-/// significant byte is equal to 0x22. If the check passes, the current CPU is little endian, and the function returns
-/// true. Otherwise, it is big endian, and the function returns false.
-///
-/// This function can be used to optimize code for different endianness architectures, by allowing the compiler to make
-/// decisions at compile time based on the endianness of the CPU. This can lead to improved performance and reduced code
-/// size.
-///
-/// @return true if the current CPU is little endian, false otherwise.
 static constexpr bool
-is_lsb()
+is_lsb() noexcept
 {
-    std::uint16_t               test{0x3322};
-    std::array<std::uint8_t, 2> arr{};
-    std::copy(&test, (&test) + 1, arr.begin());
-    return arr[0] == 0x22;
+#if defined(__cpp_lib_endian)
+    return std::endian::native == std::endian::little;
+#elif defined(__BYTE_ORDER__) && defined(__ORDER_LITTLE_ENDIAN__) && defined(__ORDER_BIG_ENDIAN__)
+    return __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__;
+#elif defined(_WIN32) || defined(__LITTLE_ENDIAN__) || defined(__ARMEL__) || defined(__AARCH64EL__) || defined(__MIPSEL__) \
+    || defined(__i386__) || defined(__x86_64__)
+    return true;
+#else
+    // Conservative fallback: unknown target => assume big-endian is possible.
+    return false;
+#endif
 }
 
 template <class Type>
-/**
- * A union that can be used to represent a value of a given type in memory as an array of bytes.
- *
- * The data is stored in two ways: as a set of fields, and as a set of bytes. This allows for efficient
- * serialization and deserialization of the data, as well as for interoperation with other data structures
- * that use different representations for the same data.
- *
- * The template parameter Type specifies the type of data that the union is intended to hold.
- */
-union data {
-    /** The actual data stored in the union. */
-    Type fields;
-    /** The data stored as an array of bytes. */
-    std::array<std::uint8_t, sizeof(fields)> pure;
+struct data {
+    static_assert(std::is_trivially_copyable_v<Type>,
+                  "xitren::func::data requires trivially copyable Type (for safe byte serialization)");
 
-    /**
-     * Deserialize a value of type Type from an input iterator.
-     *
-     * @param begin The input iterator pointing to the beginning of the data to be deserialized.
-     * @return The deserialized value of type Type.
-     */
+    using value_type = Type;
+    static constexpr std::size_t size = sizeof(Type);
+    using array_type                  = std::array<std::uint8_t, size>;
+
     template <std::input_iterator InputIterator>
     static constexpr Type
     deserialize(InputIterator begin) noexcept
     {
-        data<Type> tt{};
-        std::copy(begin, begin + sizeof(fields), tt.pure.begin());
-        return tt.fields;
+        Type      out{};
+        array_type tmp{};
+        for (std::size_t i{}; i < size; ++i, ++begin) {
+            tmp[i] = static_cast<std::uint8_t>(*begin);
+        }
+        std::memcpy(&out, tmp.data(), size);
+        return out;
     }
 
-    /**
-     * Serialize a value of type Type into an array of bytes.
-     *
-     * @param fields The value of type Type to be serialized.
-     * @return The serialized data as an array of bytes.
-     */
-    static constexpr std::array<std::uint8_t, sizeof(fields)>
-    serialize(Type const& fields) noexcept
+    static constexpr array_type
+    serialize(Type const& value) noexcept
     {
-        data<Type> tt{fields};
-        return tt.pure;
+        array_type out{};
+        std::memcpy(out.data(), &value, size);
+        return out;
     }
 
-    /**
-     * Serialize a value of type Type into an input iterator.
-     *
-     * @param type The value of type Type to be serialized.
-     * @param begin The input iterator pointing to the beginning of the data to be written.
-     */
-    template <std::input_iterator InputIterator>
+    template <std::output_iterator<std::uint8_t> OutputIterator>
     static constexpr void
-    serialize(Type const& type, InputIterator begin) noexcept
+    serialize(Type const& value, OutputIterator begin) noexcept
     {
-        data<Type> tt{type};
-        std::copy(tt.pure.begin(), tt.pure.end(), begin);
+        auto const bytes = serialize(value);
+        for (auto b : bytes) {
+            *begin++ = b;
+        }
     }
 };
 
@@ -101,9 +84,9 @@ union data {
 static constexpr std::uint16_t
 swap(std::uint16_t val) noexcept
 {
-    data<std::uint16_t> l{val};
-    std::swap(l.pure[0], l.pure[1]);
-    return l.fields;
+    auto bytes = data<std::uint16_t>::serialize(val);
+    std::swap(bytes[0], bytes[1]);
+    return data<std::uint16_t>::deserialize(bytes.begin());
 }
 
 /**
@@ -114,10 +97,10 @@ swap(std::uint16_t val) noexcept
 static constexpr std::uint32_t
 swap(std::uint32_t val) noexcept
 {
-    data<std::uint32_t> l{val};
-    std::swap(l.pure[0], l.pure[3]);
-    std::swap(l.pure[1], l.pure[2]);
-    return l.fields;
+    auto bytes = data<std::uint32_t>::serialize(val);
+    std::swap(bytes[0], bytes[3]);
+    std::swap(bytes[1], bytes[2]);
+    return data<std::uint32_t>::deserialize(bytes.begin());
 }
 
 /**
@@ -128,12 +111,12 @@ swap(std::uint32_t val) noexcept
 static constexpr std::uint64_t
 swap(std::uint64_t val) noexcept
 {
-    data<std::uint64_t> l{val};
-    std::swap(l.pure[0], l.pure[7]);
-    std::swap(l.pure[1], l.pure[6]);
-    std::swap(l.pure[2], l.pure[5]);
-    std::swap(l.pure[3], l.pure[4]);
-    return l.fields;
+    auto bytes = data<std::uint64_t>::serialize(val);
+    std::swap(bytes[0], bytes[7]);
+    std::swap(bytes[1], bytes[6]);
+    std::swap(bytes[2], bytes[5]);
+    std::swap(bytes[3], bytes[4]);
+    return data<std::uint64_t>::deserialize(bytes.begin());
 }
 
 template <class T>

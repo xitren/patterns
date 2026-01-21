@@ -12,16 +12,15 @@ __ _(_) |_ _ _ ___ _ _
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
 #include <functional>
 #include <mutex>
 #include <optional>
-#include <queue>
-#include <ranges>
+#include <condition_variable>
+#include <deque>
 #include <thread>
 #include <utility>
-#include <variant>
-#include <vector>
 
 namespace xitren::comm {
 
@@ -31,45 +30,58 @@ template <class Type, class NextType, std::size_t BufferSize, func::log_adapter_
 class pipeline_stage {
     static int const measure_points = 10;
 
-    using atomic_cnt_type    = std::atomic<std::size_t>;
-    using atomic_closed_type = std::atomic<bool>;
     using ready_type         = std::optional<Type>;
     using measure_type       = std::pair<int, int>;
     using statistics_type    = std::deque<measure_type>;
-    using queue_type         = struct type_tag {
-        std::array<ready_type, BufferSize> array;
-        atomic_cnt_type                    tail;
-    };
-    using function_type = std::function<const NextType(pipeline_stage_exception, const Type, const measure_type)>;
+    using queue_type         = std::array<ready_type, BufferSize>;
+    using function_type      = std::function<NextType(pipeline_stage_exception, Type const&, measure_type)>;
 
 public:
     pipeline_stage(function_type func) : func_{func} {}
 
     ~pipeline_stage()
     {
-        closed_ = true;
+        {
+            std::lock_guard<std::mutex> lock(mtx_);
+            closed_ = true;
+        }
+        cv_.notify_all();
         if (worker_.joinable()) {
             worker_.join();
         }
     }
 
     void
-    push(Type const&& data)
+    push(Type&& data)
     {
-        auto const i                          = queue_.tail++;
-        queue_.array[i % queue_.array.size()] = data;
+        std::unique_lock<std::mutex> lock(mtx_);
+        cv_space_.wait(lock, [&] { return closed_ || size_ < BufferSize; });
+        if (closed_) {
+            return;
+        }
+        queue_[tail_] = std::move(data);
+        tail_         = (tail_ + 1) % BufferSize;
+        ++size_;
+        cv_.notify_one();
 #ifdef DEBUG
-        Log::trace() << "Index: " << queue_.tail << "\n";
+        Log::trace() << "Queued size: " << size_ << "\n";
 #endif
     }
 
     void
     push(Type const& data)
     {
-        auto const i                          = queue_.tail++;
-        queue_.array[i % queue_.array.size()] = data;
+        std::unique_lock<std::mutex> lock(mtx_);
+        cv_space_.wait(lock, [&] { return closed_ || size_ < BufferSize; });
+        if (closed_) {
+            return;
+        }
+        queue_[tail_] = data;
+        tail_         = (tail_ + 1) % BufferSize;
+        ++size_;
+        cv_.notify_one();
 #ifdef DEBUG
-        Log::trace() << "Index: " << queue_.tail << "\n";
+        Log::trace() << "Queued size: " << size_ << "\n";
 #endif
     }
 
@@ -94,9 +106,14 @@ public:
     }
 
 private:
-    atomic_cnt_type    tail_{0};
-    atomic_closed_type closed_{false};
-    queue_type         queue_{};
+    mutable std::mutex              mtx_{};
+    std::condition_variable         cv_{};
+    std::condition_variable         cv_space_{};
+    bool                            closed_{false};
+    queue_type                      queue_{};
+    std::size_t                     head_{0};
+    std::size_t                     tail_{0};
+    std::size_t                     size_{0};
     function_type      func_{};
     statistics_type    stat_{};
 
@@ -105,34 +122,40 @@ private:
 #ifdef DEBUG
         Log::debug() << "Started thread... \n";
 #endif
-        while (!closed_ || ((queue_.tail - tail_) > 0)) {
-            while (tail_ < queue_.tail) {
-                if (!(queue_.array[(tail_) % queue_.array.size()])) {
-                    std::this_thread::sleep_for(0ms);
-#ifdef DEBUG
-                    Log::trace() << "Data are not ready!\n";
-#endif
-                    continue;
+        for (;;) {
+            ready_type item;
+            int        pending{};
+            {
+                std::unique_lock<std::mutex> lock(mtx_);
+                cv_.wait(lock, [&] { return closed_ || size_ > 0; });
+                if (closed_ && size_ == 0) {
+                    break;
                 }
-                auto const i = tail_++;
-#ifdef DEBUG
-                Log::trace() << "Index to process: " << i << "\n";
-#endif
-                auto& data = queue_.array[i % queue_.array.size()];
-                auto  last_time{std::chrono::system_clock::now()};
-                func_(pipeline_stage_exception::no_error, data.value(),
-                      measure_type{time_for_unit(), buffer_utilization()});
-                auto elapsed = std::chrono::system_clock::now() - last_time;
-                stat_.push_front(measure_type{std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count(),
-                                              queue_.tail - tail_});
-                if (stat_.size() > measure_points) {
-                    stat_.pop_back();
-                }
+                item = std::move(queue_[head_]);
+                queue_[head_].reset();
+                head_ = (head_ + 1) % BufferSize;
+                --size_;
+                pending = static_cast<int>(size_);
+                cv_space_.notify_one();
             }
-            std::this_thread::sleep_for(0ms);
+
+            if (!item) {
+                continue;
+            }
+
+            auto last_time{std::chrono::steady_clock::now()};
+            func_(pipeline_stage_exception::no_error, item.value(), measure_type{time_for_unit(), buffer_utilization()});
+            auto elapsed = std::chrono::steady_clock::now() - last_time;
+
+            stat_.push_front(
+                measure_type{static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count()),
+                             pending});
+            if (stat_.size() > measure_points) {
+                stat_.pop_back();
+            }
         }
 #ifdef DEBUG
-        Log::debug() << "All lines parsed: " << tail_ << "\n";
+        Log::debug() << "End thread... \n";
         Log::debug() << "End thread... \n";
 #endif
     }};

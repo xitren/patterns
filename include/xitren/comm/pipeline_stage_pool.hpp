@@ -13,15 +13,16 @@ __ _(_) |_ _ _ ___ _ _
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <chrono>
 #include <cstdint>
+#include <deque>
 #include <functional>
+#include <limits>
 #include <mutex>
 #include <optional>
-#include <queue>
-#include <ranges>
+#include <condition_variable>
 #include <thread>
 #include <utility>
-#include <variant>
 #include <vector>
 
 namespace xitren::comm {
@@ -36,19 +37,21 @@ template <class Type, class NextType, std::size_t BufferSize, std::size_t PoolSi
 class pipeline_stage_pool {
     static int const measure_points = 10;
 
-    using atomic_cnt_type    = std::atomic<std::size_t>;
-    using atomic_closed_type = std::atomic<bool>;
     using ready_type         = std::optional<Type>;
     using statistics_type    = std::deque<measure_data>;
     using queue_type         = struct type_tag {
-        std::array<ready_type, BufferSize> array;
-        statistics_type                    stat;
-        atomic_cnt_type                    tail;
-        atomic_cnt_type                    head;
+        std::array<ready_type, BufferSize> array{};
+        statistics_type                    stat{};
+        std::size_t                        head{0};
+        std::size_t                        tail{0};
+        std::size_t                        size{0};
+        std::mutex                         mtx{};
+        std::condition_variable            cv{};
+        std::condition_variable            cv_space{};
     };
-    using pool_type     = std::array<queue_type, 8>;
+    using pool_type     = std::array<queue_type, PoolSize>;
     using thread_type   = std::vector<std::thread>;
-    using function_type = std::function<const NextType(pipeline_stage_exception, const Type, const measure_data)>;
+    using function_type = std::function<NextType(pipeline_stage_exception, Type const&, measure_data)>;
 
 public:
     pipeline_stage_pool(function_type func) : func_{func}, pool_size_{PoolSize}
@@ -58,35 +61,37 @@ public:
 #ifdef DEBUG
             Log::debug() << "Started thread " << pool_thread_n << "... \n";
 #endif
-            auto& [array_l, stat_l, tail_l, head_l] = pool_[pool_thread_n];
-
-            while (!closed_ || ((tail_l - head_l) > 0)) {
-                while (head_l < tail_l) {
-                    if (!(array_l[(head_l) % array_l.size()])) {
-                        std::this_thread::sleep_for(0ms);
-#ifdef DEBUG
-                        Log::trace() << "[" << pool_thread_n << "] Data are not ready!\n";
-#endif
-                        continue;
+            auto& q = pool_[pool_thread_n];
+            for (;;) {
+                ready_type item;
+                int        pending{};
+                {
+                    std::unique_lock<std::mutex> lock(q.mtx);
+                    q.cv.wait(lock, [&] { return closed_ || q.size > 0; });
+                    if (closed_ && q.size == 0) {
+                        break;
                     }
-                    auto const i = head_l++;
-#ifdef DEBUG
-                    Log::trace() << "[" << pool_thread_n << "] Index to process: " << i << "\n";
-#endif
-                    auto& data = array_l[i % array_l.size()];
-                    auto  last_time{std::chrono::system_clock::now()};
-                    func_(pipeline_stage_exception::no_error, data.value(),
-                          measure_data{pool_thread_n, time_for_unit(stat_l), buffer_utilization(stat_l)});
-                    auto elapsed = std::chrono::system_clock::now() - last_time;
-                    stat_l.push_front(measure_data{
-                        pool_thread_n,
-                        static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count()),
-                        static_cast<int>(tail_l - head_l)});
-                    if (stat_l.size() > measure_points) {
-                        stat_l.pop_back();
-                    }
+                    item = std::move(q.array[q.head]);
+                    q.array[q.head].reset();
+                    q.head = (q.head + 1) % BufferSize;
+                    --q.size;
+                    pending = static_cast<int>(q.size);
+                    q.cv_space.notify_one();
                 }
-                std::this_thread::sleep_for(0ms);
+                if (!item) {
+                    continue;
+                }
+                auto last_time{std::chrono::steady_clock::now()};
+                func_(pipeline_stage_exception::no_error, item.value(),
+                      measure_data{pool_thread_n, time_for_unit(q.stat), buffer_utilization(q.stat)});
+                auto elapsed = std::chrono::steady_clock::now() - last_time;
+                q.stat.push_front(measure_data{
+                    pool_thread_n,
+                    static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count()),
+                    pending});
+                if (q.stat.size() > measure_points) {
+                    q.stat.pop_back();
+                }
             }
 #ifdef DEBUG
             Log::debug() << "End thread " << pool_thread_n << "... \n";
@@ -101,6 +106,10 @@ public:
     ~pipeline_stage_pool()
     {
         closed_ = true;
+        for (auto& q : pool_) {
+            q.cv.notify_all();
+            q.cv_space.notify_all();
+        }
         for (auto& worker : pool_threads_) {
             if (worker.joinable()) {
                 worker.join();
@@ -109,13 +118,21 @@ public:
     }
 
     void
-    push(Type const&& data)
+    push(Type&& data)
     {
         auto const min_id{min_thread()};
-        auto const i                                        = pool_[min_id].tail++;
-        pool_[min_id].array[i % pool_[min_id].array.size()] = data;
+        auto&      q = pool_[min_id];
+        std::unique_lock<std::mutex> lock(q.mtx);
+        q.cv_space.wait(lock, [&] { return closed_ || q.size < BufferSize; });
+        if (closed_) {
+            return;
+        }
+        q.array[q.tail] = std::move(data);
+        q.tail          = (q.tail + 1) % BufferSize;
+        ++q.size;
+        q.cv.notify_one();
 #ifdef DEBUG
-        Log::trace() << "Index[" << min_id << "]: " << pool_[min_id].tail << "\n";
+        Log::trace() << "Queued[" << min_id << "]: " << q.size << "\n";
 #endif
     }
 
@@ -123,10 +140,18 @@ public:
     push(Type const& data)
     {
         auto const min_id{min_thread()};
-        auto const i                                        = pool_[min_id].tail++;
-        pool_[min_id].array[i % pool_[min_id].array.size()] = data;
+        auto&      q = pool_[min_id];
+        std::unique_lock<std::mutex> lock(q.mtx);
+        q.cv_space.wait(lock, [&] { return closed_ || q.size < BufferSize; });
+        if (closed_) {
+            return;
+        }
+        q.array[q.tail] = data;
+        q.tail          = (q.tail + 1) % BufferSize;
+        ++q.size;
+        q.cv.notify_one();
 #ifdef DEBUG
-        Log::trace() << "Index[" << min_id << "]: " << pool_[min_id].tail << "\n";
+        Log::trace() << "Queued[" << min_id << "]: " << q.size << "\n";
 #endif
     }
 
@@ -151,7 +176,7 @@ public:
     }
 
 private:
-    atomic_closed_type closed_{false};
+    std::atomic<bool>  closed_{false};
     function_type      func_{};
     statistics_type    stat_{};
     std::size_t        pool_size_{};
@@ -165,7 +190,7 @@ private:
         int         min_i{0};
         int         i{};
         for (auto& item : pool_) {
-            auto const size{item.tail - item.head};
+            auto const size{item.size};
             if (min > size) {
                 min   = size;
                 min_i = i;

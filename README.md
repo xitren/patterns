@@ -26,6 +26,7 @@ This project contains a set of patterns for frequent use in embedded projects.
 ## Patterns list
 
 ### Transaction
+Подробнее: `docs/patterns/transaction.md`
 A transaction in C++ is a sequence of commands that is either executed completely or, in the case of an error, is not executed at all. In case of an error, the transaction rolls back all changes made to the system from the beginning to the moment the error occurs.
 ~~~cpp
 using namespace xitren::func;
@@ -52,6 +53,7 @@ EXPECT_TRUE(data2 == 68);
 ~~~
 
 ### Static Allocator
+Подробнее: `docs/patterns/static-heap-and-allocator.md`
 Static Allocation: Static allocation is an allocation procedure that is used to allocate all the data objects in predefined memory area. In this type of allocation, data objects are allocated without MMU unit. 
 
 Memory Location: A variable that is stored in the user defined region of the program.
@@ -71,12 +73,13 @@ vec.reserve(8);
 ~~~
 
 ### LRU cache
+Подробнее: `docs/patterns/lru-cache.md`
 Cache replacement algorithms are efficiently designed to replace the cache when the space is full. The Least Recently Used (LRU) is one of those algorithms. As the name suggests when the cache memory is full, LRU picks the data that is least recently used and removes it in order to make space for the new data. The priority of the data in the cache changes according to the need of that data i.e. if some data is fetched or updated recently then the priority of that data would be changed and assigned to the highest priority , and the priority of the data decreases if it remains unused operations after operations.
 
 Operations on LRU Cache:
-lru (expired): Initialize LRU cache with expiring period.
-get (key) : Returns the value of key ‘ k’ if it is present in the cache otherwise it returns -1. Also updates the priority of data in the LRU cache.
-put (key, value): Update the value of the key if that key exists, Otherwise, add a key-value pair to the cache. If the number of keys exceeds the capacity of the LRU cache then dismiss the least recently used key.
+lru (expired_after): Initialize LRU cache with expiring duration (recommended: `std::chrono` duration, based on `steady_clock`).
+get (key) : Returns `std::optional<Value>` and updates the priority (most recently used). If `Exception=true`, may throw `cache_missed` / `cache_timeout`.
+put (key, value): Insert/update a key-value pair. If the number of keys exceeds the capacity, evicts the least recently used key.
 
 ~~~cpp
 using namespace xitren::cache;
@@ -88,6 +91,7 @@ inst.get(11);
 
 
 ### Observer
+Подробнее: `docs/patterns/observer.md` и `docs/patterns/observer-values.md`
 An observer is a behavioral design pattern that creates a subscription mechanism that allows one object to monitor and respond to events occurring in other objects.
 Imagine that you have two objects: a Customer and a Store. A new product that is interesting to the customer is about to be delivered to the store.
 
@@ -132,6 +136,7 @@ res1.notify_observers(nd);
 ~~~
 
 ### Mediator
+Подробнее: `docs/patterns/mediator.md`
 Mediator is a behavioral design pattern that reduces the connectivity of multiple classes to each other by moving these connections into a single intermediary class.
 
 Let's assume that you have a dialog for creating a user profile. It consists of all kinds of controls — text fields, checkboxes, buttons.
@@ -145,6 +150,8 @@ In our example, the mediator could be a dialogue. Most likely, the dialog class 
 You can use it through the provided template as follows:
 ~~~cpp
 using namespace xitren::comm;
+
+// Note: mediator messages are byte-serialized, so message types must be trivially copyable.
 
 class data1 {
 public:
@@ -227,7 +234,9 @@ dt.send(data3{});
 ~~~
 
 ### Pipeline
+Подробнее: `docs/patterns/pipeline.md`
 Implements a non-blocking handler in a separate thread using atomic operations.
+Current implementation uses a bounded buffer and blocks `push()` when the buffer is full (to avoid overwriting and data races).
 
 ~~~cpp
 using namespace xitren::comm;
@@ -248,6 +257,7 @@ for (int i{}; i < 100; i++) {
 ~~~
 
 ### Command-line parameter parser
+Подробнее: `docs/patterns/argv-parser.md`
 A command-line parameter handler for applications without using external dependencies.
 
 ~~~cpp
@@ -270,6 +280,7 @@ std::cout << "baud_rate = " << detected_opts.baud_rate << std::endl;
 ~~~
 
 ### LSB & MSB abstraction
+Подробнее: `docs/patterns/endian-wrappers.md`
 ~~~cpp
 using namespace xitren::func;
 
@@ -278,8 +289,10 @@ data.get();
 ~~~
 
 ### PIMPL
+Подробнее: `docs/patterns/fast-pimpl.md`
 
 ### Packet serializer/deserializer
+Подробнее: `docs/patterns/packet.md`
 Serialization is a mechanism of converting the state of an object into a byte stream. Deserialization is the reverse process where the byte stream is used to recreate the actual object in memory. This mechanism is used to persist the object.
 ~~~cpp
 using namespace xitren::func;
@@ -321,6 +334,7 @@ public:
 
 packet<header_ext, noise_frame, crc16ansi> pack(noise_frame::header, adf);
 packet<header_ext, noise_frame, crc16ansi> pack_recv(pack.to_array());
+auto hdr = pack_recv.header(); // returned by value
 ~~~
 
 ## Building and developing
@@ -341,7 +355,36 @@ commands:
 
 ~~~shell
 cmake --preset=clang_host_release_linux
-cmake --build --preset=clang_host_release_linux -t test
+cmake --build --preset=clang_host_release_linux
+ctest --test-dir out/build/clang_host_release_linux --output-on-failure
+~~~
+
+### Sanitizers (Linux, clang)
+
+Note: on some Linux environments you may need the compiler runtime package (compiler-rt). For Ubuntu:
+
+~~~shell
+sudo apt-get update && sudo apt-get install -y clang llvm compiler-rt
+~~~
+
+Note (Alpine/musl): AddressSanitizer/ThreadSanitizer support may be limited or unstable. If you are using the provided
+Alpine-based devcontainer, prefer running sanitizers in CI (GitHub Actions) or use the optional Ubuntu/glibc devcontainer
+(`.devcontainer/devcontainer.ubuntu.json`).
+
+ASan + UBSan:
+
+~~~shell
+cmake --preset=clang_host_asan_ubsan_linux
+cmake --build --preset=clang_host_asan_ubsan_linux
+ctest --test-dir out/build/clang_host_asan_ubsan_linux --output-on-failure
+~~~
+
+TSan:
+
+~~~shell
+cmake --preset=clang_host_tsan_linux
+cmake --build --preset=clang_host_tsan_linux
+ctest --test-dir out/build/clang_host_tsan_linux --output-on-failure
 ~~~
 
 ## Project layout

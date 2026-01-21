@@ -131,6 +131,39 @@
             ]
         },
         {
+            "name": "sanitize_common",
+            "hidden": true,
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_FLAGS": "-fno-omit-frame-pointer -fno-optimize-sibling-calls -g",
+                "CMAKE_CXX_FLAGS": "-fno-omit-frame-pointer -fno-optimize-sibling-calls -g"
+            }
+        },
+        {
+            "name": "clang_host_asan_ubsan_linux",
+            "displayName": "Clang ASan+UBSan Debug Linux",
+            "inherits": [
+                "clang_host_debug_linux",
+                "sanitize_common"
+            ],
+            "cacheVariables": {
+                "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-optimize-sibling-calls -g",
+                "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-optimize-sibling-calls -g"
+            }
+        },
+        {
+            "name": "clang_host_tsan_linux",
+            "displayName": "Clang TSan Debug Linux",
+            "inherits": [
+                "clang_host_debug_linux",
+                "sanitize_common"
+            ],
+            "cacheVariables": {
+                "CMAKE_C_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer -fno-optimize-sibling-calls -g",
+                "CMAKE_CXX_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer -fno-optimize-sibling-calls -g"
+            }
+        },
+        {
             "name": "gcc_host_debug_mac",
             "inherits": [
                 "config_host_debug_mac",
@@ -210,6 +243,16 @@
             "name": "clang_host_release_linux",
             "displayName": "Clang Release Linux",
             "configurePreset": "clang_host_release_linux"
+        },
+        {
+            "name": "clang_host_asan_ubsan_linux",
+            "displayName": "Clang ASan+UBSan Debug Linux",
+            "configurePreset": "clang_host_asan_ubsan_linux"
+        },
+        {
+            "name": "clang_host_tsan_linux",
+            "displayName": "Clang TSan Debug Linux",
+            "configurePreset": "clang_host_tsan_linux"
         }
     ],
     "testPresets": [
@@ -230,6 +273,32 @@
             "name": "tests_host_all_linux",
             "displayName": "Host All Linux",
             "configurePreset": "gcc_host_release_linux",
+            "output": {
+                "outputOnFailure": true,
+                "verbosity": "extra"
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": true
+            }
+        },
+        {
+            "name": "tests_clang_asan_ubsan_linux",
+            "displayName": "Clang ASan+UBSan Linux",
+            "configurePreset": "clang_host_asan_ubsan_linux",
+            "output": {
+                "outputOnFailure": true,
+                "verbosity": "extra"
+            },
+            "execution": {
+                "noTestsAction": "error",
+                "stopOnFailure": true
+            }
+        },
+        {
+            "name": "tests_clang_tsan_linux",
+            "displayName": "Clang TSan Linux",
+            "configurePreset": "clang_host_tsan_linux",
             "output": {
                 "outputOnFailure": true,
                 "verbosity": "extra"

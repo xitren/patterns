@@ -1,0 +1,49 @@
+name: Sanitizers (clang)
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  asan-ubsan:
+    name: ASan+UBSan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+
+      - name: Install sanitizer runtime (compiler-rt)
+        run: sudo apt-get update && sudo apt-get install -y clang llvm compiler-rt
+
+      - name: Configure (ASan+UBSan)
+        run: cmake --preset=clang_host_asan_ubsan_linux
+
+      - name: Build (ASan+UBSan)
+        run: cmake --build --preset=clang_host_asan_ubsan_linux
+
+      - name: Test (ASan+UBSan)
+        run: ctest --test-dir out/build/clang_host_asan_ubsan_linux --output-on-failure
+
+  tsan:
+    name: TSan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: 'recursive'
+
+      - name: Install sanitizer runtime (compiler-rt)
+        run: sudo apt-get update && sudo apt-get install -y clang llvm compiler-rt
+
+      - name: Configure (TSan)
+        run: cmake --preset=clang_host_tsan_linux
+
+      - name: Build (TSan)
+        run: cmake --build --preset=clang_host_tsan_linux
+
+      - name: Test (TSan)
+        run: ctest --test-dir out/build/clang_host_tsan_linux --output-on-failure
+

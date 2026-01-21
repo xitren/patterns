@@ -59,7 +59,7 @@ public:
     constexpr bool
     operator==(static_heap_allocator<U, PoolSize> const& other) noexcept
     {
-        return this == &other;
+        return &manager_ == &other.manager_;
     }
 
     template <typename U>

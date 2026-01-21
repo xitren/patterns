@@ -69,7 +69,8 @@ TEST(package_base_test, packets_eq)
         adf.data = static_cast<uint16_t>(std::rand());
         packet<header_ext, noise_frame, crc16ansi> pack(noise_frame::header, adf);
         packet<header_ext, noise_frame, crc16ansi> pack_recv(pack.to_array());
-        ASSERT_EQ(noise_frame::header.magic_header[0], pack_recv.header().magic_header[0]);
-        ASSERT_EQ(noise_frame::header.magic_header[1], pack_recv.header().magic_header[1]);
+        auto const hdr = pack_recv.header();
+        ASSERT_EQ(noise_frame::header.magic_header[0], hdr.magic_header[0]);
+        ASSERT_EQ(noise_frame::header.magic_header[1], hdr.magic_header[1]);
     }
 }
