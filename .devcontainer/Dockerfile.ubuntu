@@ -14,7 +14,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gdb \
     gcc-12 g++-12 \
     gcc-arm-none-eabi g++-arm-none-eabi \
-    clang-16 llvm-16 compiler-rt-16 \
+    clang-16 llvm-16 libclang-rt-16-dev \
     && rm -rf /var/lib/apt/lists/*
 
 RUN ln -sf /usr/bin/gcc-12 /usr/bin/gcc \

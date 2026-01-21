@@ -19,7 +19,7 @@ jobs:
           submodules: 'recursive'
 
       - name: Install sanitizer runtime (compiler-rt)
-        run: sudo apt-get update && sudo apt-get install -y clang llvm compiler-rt
+        run: sudo apt-get update && sudo apt-get install -y clang llvm libclang-rt-16-dev
 
       - name: Configure (ASan+UBSan)
         run: cmake --preset=clang_host_asan_ubsan_linux
@@ -43,7 +43,7 @@ jobs:
           submodules: 'recursive'
 
       - name: Install sanitizer runtime (compiler-rt)
-        run: sudo apt-get update && sudo apt-get install -y clang llvm compiler-rt
+        run: sudo apt-get update && sudo apt-get install -y clang llvm libclang-rt-16-dev
 
       - name: Configure (TSan)
         run: cmake --preset=clang_host_tsan_linux
