@@ -10,6 +10,9 @@ jobs:
   asan-ubsan:
     name: ASan+UBSan
     runs-on: ubuntu-latest
+    env:
+      ASAN_OPTIONS: "halt_on_error=1:abort_on_error=1"
+      UBSAN_OPTIONS: "halt_on_error=1:abort_on_error=1"
     steps:
       - uses: actions/checkout@v3
         with:
@@ -25,11 +28,15 @@ jobs:
         run: cmake --build --preset=clang_host_asan_ubsan_linux
 
       - name: Test (ASan+UBSan)
+        env:
+          LLVM_SYMBOLIZER_PATH: /usr/bin/llvm-symbolizer
         run: ctest --test-dir out/build/clang_host_asan_ubsan_linux --output-on-failure
 
   tsan:
     name: TSan
     runs-on: ubuntu-latest
+    env:
+      TSAN_OPTIONS: "halt_on_error=1:abort_on_error=1"
     steps:
       - uses: actions/checkout@v3
         with:
@@ -45,5 +52,7 @@ jobs:
         run: cmake --build --preset=clang_host_tsan_linux
 
       - name: Test (TSan)
+        env:
+          LLVM_SYMBOLIZER_PATH: /usr/bin/llvm-symbolizer
         run: ctest --test-dir out/build/clang_host_tsan_linux --output-on-failure
 

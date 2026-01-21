@@ -147,6 +147,7 @@
                 "sanitize_common"
             ],
             "cacheVariables": {
+                "PATTERNS_GTEST_DISCOVERY": "OFF",
                 "CMAKE_C_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-optimize-sibling-calls -g",
                 "CMAKE_CXX_FLAGS": "-fsanitize=address,undefined -fno-sanitize-recover=all -fno-omit-frame-pointer -fno-optimize-sibling-calls -g"
             }
@@ -159,6 +160,7 @@
                 "sanitize_common"
             ],
             "cacheVariables": {
+                "PATTERNS_GTEST_DISCOVERY": "OFF",
                 "CMAKE_C_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer -fno-optimize-sibling-calls -g",
                 "CMAKE_CXX_FLAGS": "-fsanitize=thread -fno-omit-frame-pointer -fno-optimize-sibling-calls -g"
             }

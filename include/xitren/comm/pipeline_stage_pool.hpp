@@ -44,7 +44,7 @@ class pipeline_stage_pool {
         statistics_type                    stat{};
         std::size_t                        head{0};
         std::size_t                        tail{0};
-        std::size_t                        size{0};
+        std::atomic<std::size_t>           size{0};
         std::mutex                         mtx{};
         std::condition_variable            cv{};
         std::condition_variable            cv_space{};
@@ -67,15 +67,15 @@ public:
                 int        pending{};
                 {
                     std::unique_lock<std::mutex> lock(q.mtx);
-                    q.cv.wait(lock, [&] { return closed_ || q.size > 0; });
-                    if (closed_ && q.size == 0) {
+                    q.cv.wait(lock, [&] { return closed_ || q.size.load(std::memory_order_relaxed) > 0; });
+                    if (closed_ && q.size.load(std::memory_order_relaxed) == 0) {
                         break;
                     }
                     item = std::move(q.array[q.head]);
                     q.array[q.head].reset();
                     q.head = (q.head + 1) % BufferSize;
-                    --q.size;
-                    pending = static_cast<int>(q.size);
+                    auto const new_size = q.size.fetch_sub(1, std::memory_order_relaxed) - 1;
+                    pending = static_cast<int>(new_size);
                     q.cv_space.notify_one();
                 }
                 if (!item) {
@@ -123,16 +123,16 @@ public:
         auto const min_id{min_thread()};
         auto&      q = pool_[min_id];
         std::unique_lock<std::mutex> lock(q.mtx);
-        q.cv_space.wait(lock, [&] { return closed_ || q.size < BufferSize; });
+        q.cv_space.wait(lock, [&] { return closed_ || q.size.load(std::memory_order_relaxed) < BufferSize; });
         if (closed_) {
             return;
         }
         q.array[q.tail] = std::move(data);
         q.tail          = (q.tail + 1) % BufferSize;
-        ++q.size;
+        q.size.fetch_add(1, std::memory_order_relaxed);
         q.cv.notify_one();
 #ifdef DEBUG
-        Log::trace() << "Queued[" << min_id << "]: " << q.size << "\n";
+        Log::trace() << "Queued[" << min_id << "]: " << q.size.load(std::memory_order_relaxed) << "\n";
 #endif
     }
 
@@ -142,16 +142,16 @@ public:
         auto const min_id{min_thread()};
         auto&      q = pool_[min_id];
         std::unique_lock<std::mutex> lock(q.mtx);
-        q.cv_space.wait(lock, [&] { return closed_ || q.size < BufferSize; });
+        q.cv_space.wait(lock, [&] { return closed_ || q.size.load(std::memory_order_relaxed) < BufferSize; });
         if (closed_) {
             return;
         }
         q.array[q.tail] = data;
         q.tail          = (q.tail + 1) % BufferSize;
-        ++q.size;
+        q.size.fetch_add(1, std::memory_order_relaxed);
         q.cv.notify_one();
 #ifdef DEBUG
-        Log::trace() << "Queued[" << min_id << "]: " << q.size << "\n";
+        Log::trace() << "Queued[" << min_id << "]: " << q.size.load(std::memory_order_relaxed) << "\n";
 #endif
     }
 
@@ -190,7 +190,7 @@ private:
         int         min_i{0};
         int         i{};
         for (auto& item : pool_) {
-            auto const size{item.size};
+            auto const size{item.size.load(std::memory_order_relaxed)};
             if (min > size) {
                 min   = size;
                 min_i = i;
